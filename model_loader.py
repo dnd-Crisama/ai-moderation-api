@@ -55,5 +55,6 @@ def load_model():
 
 def get_tokenizer():  return _tokenizer
 def get_model():      return _model
+def get_session():    return _model.model
 def get_thresholds(): return _thresholds
 def get_max_len():    return _max_len
