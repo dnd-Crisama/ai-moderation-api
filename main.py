@@ -1,68 +1,35 @@
-# ai-moderation-api/model_loader.py
-import os, json, gc
-from huggingface_hub import snapshot_download
-from optimum.onnxruntime import ORTModelForSequenceClassification
-from transformers import AutoTokenizer
-from onnxruntime import SessionOptions, GraphOptimizationLevel
+# ai-moderation-api/main.py
+import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from model_loader import load_model
+from inference import predict as run_predict
 
-HF_MODEL_ID  = os.getenv("HF_MODEL_ID", "crisama/toxic-comment-vi-en")
-HF_TOKEN     = os.getenv("HF_TOKEN", None)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    load_model()
+    yield
 
-_tokenizer  = None
-_model      = None
-_thresholds = {"delete": 0.95, "flag": 0.75}
-_max_len    = 128
+app = FastAPI(title="Toxic Comment API", lifespan=lifespan)
 
-def load_model():
-    global _tokenizer, _model, _thresholds, _max_len
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST", "GET"],
+    allow_headers=["*"],
+)
 
-    print(f"[model_loader] Downloading: {HF_MODEL_ID}")
-    local_dir = snapshot_download(
-        repo_id=HF_MODEL_ID,
-        token=HF_TOKEN,
-        local_dir="/tmp/toxic_model",
-        ignore_patterns=["*.safetensors", "*.bin", "model.onnx"],
-    )
+class PredictRequest(BaseModel):
+    text: str
 
-    _tokenizer = AutoTokenizer.from_pretrained(local_dir)
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
-    onnx_path = f"{local_dir}/model_quantized.onnx"
-    if not os.path.exists(onnx_path):
-        raise FileNotFoundError(f"model_quantized.onnx not found in {local_dir}")
-
-    size_mb = os.path.getsize(onnx_path) / 1024 / 1024
-    print(f"[model_loader] Loading ONNX ({size_mb:.0f} MB)...")
-
-    sess_opts = SessionOptions()
-    sess_opts.intra_op_num_threads = 1
-    sess_opts.inter_op_num_threads = 1
-    sess_opts.graph_optimization_level = GraphOptimizationLevel.ORT_ENABLE_ALL
-
-    _model = ORTModelForSequenceClassification.from_pretrained(
-        local_dir,
-        file_name="model_quantized.onnx",
-        session_options=sess_opts,
-        providers=["CPUExecutionProvider"],
-    )
-
-    gc.collect()
-
-    meta_path = f"{local_dir}/meta.json"
-    if os.path.exists(meta_path):
-        with open(meta_path) as f:
-            meta = json.load(f)
-        _thresholds = meta.get("thresholds", _thresholds)
-        _max_len    = meta.get("max_length", _max_len)
-
-    print(f"[model_loader] Ready. thresholds={_thresholds} max_len={_max_len}")
-
-def get_tokenizer():  return _tokenizer
-def get_model():      return _model
-def get_thresholds(): return _thresholds
-def get_max_len():    return _max_len
-```
-
-Push lên GitHub → Render redeploy. Lần này log phải in ra:
-```
-[model_loader] Loading ONNX (136 MB)...
-[model_loader] Ready. thresholds={'delete': 0.95, 'flag': 0.75}
+@app.post("/predict")
+def predict(req: PredictRequest):
+    if not req.text or not req.text.strip():
+        raise HTTPException(status_code=400, detail="text is required")
+    return run_predict(req.text)
