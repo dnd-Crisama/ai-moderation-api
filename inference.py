@@ -1,5 +1,5 @@
+# ai-moderation-api/inference.py
 import numpy as np
-# 1. Đổi get_session thành get_model
 from model_loader import get_tokenizer, get_session, get_thresholds, get_max_len
 
 def softmax(x):
@@ -8,7 +8,7 @@ def softmax(x):
 
 def predict(text: str) -> dict:
     tokenizer  = get_tokenizer()
-    model      = get_model() # 2. Gọi get_model() thay vì get_session()
+    session    = get_session()        # ← get_session, không phải get_model
     thresholds = get_thresholds()
     max_len    = get_max_len()
 
@@ -25,9 +25,8 @@ def predict(text: str) -> dict:
         "attention_mask": encoded["attention_mask"].astype(np.int64),
     }
 
-    # 3. Lấy raw ONNX session từ object ORTModel thông qua thuộc tính .model
-    outputs = model.model.run(None, inputs) 
-    logits  = outputs[0][0]  # shape: [2]
+    outputs = session.run(None, inputs)  # ← session.run trực tiếp, không .model.run
+    logits  = outputs[0][0]              # shape: [2]
     probs   = softmax(logits)
     score   = float(probs[1])
 
