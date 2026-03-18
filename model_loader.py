@@ -18,7 +18,7 @@ def load_model():
     local_dir = snapshot_download(
         repo_id=HF_MODEL_ID,
         token=HF_TOKEN,
-        local_dir="/tmp/toxic_model",
+        local_dir="/app/toxic_model",
         ignore_patterns=["*.safetensors", "*.bin", "model.onnx"],
     )
 
