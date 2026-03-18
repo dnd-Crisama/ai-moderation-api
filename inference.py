@@ -1,6 +1,6 @@
 import numpy as np
 # 1. Đổi get_session thành get_model
-from model_loader import get_tokenizer, get_model, get_thresholds, get_max_len
+from model_loader import get_tokenizer, get_session, get_model, get_thresholds, get_max_len
 
 def softmax(x):
     e = np.exp(x - np.max(x))
