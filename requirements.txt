@@ -1,19 +1,7 @@
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Cài đặt thư viện C++ OpenMP bắt buộc cho onnxruntime
-RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-# Các biến môi trường ép tiết kiệm RAM
-ENV MALLOC_ARENA_MAX=2
-ENV OMP_NUM_THREADS=1
-ENV WEB_CONCURRENCY=1
-
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+fastapi==0.111.0
+uvicorn==0.29.0
+transformers>=4.40.0
+onnxruntime==1.17.1
+huggingface_hub>=0.23.0
+python-dotenv==1.0.1
+pydantic==2.7.0
